@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do Social Media</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: barra do dia no topo, resumo de progresso, depois duas visões — Por etapa (quadro) e Por conta (grade). Editor abre em gaveta lateral. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --ink:#14213a; --muted:#5d6b82; --line:#d6dce6;
+  --accent:#1d4ed8; --accent-soft:#e3eafc; --ok:#15803d; --ok-soft:#dcf3e4; --warn:#b45309; --warn-soft:#fdf0dc;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1420; --surface:#172033; --ink:#e7ecf5; --muted:#9aa6bb; --line:#2a3650;
+    --accent:#7aa2ff; --accent-soft:#1f2c4d; --ok:#4ade80; --ok-soft:#163626; --warn:#fbbf24; --warn-soft:#3a2c12;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1420; --surface:#172033; --ink:#e7ecf5; --muted:#9aa6bb; --line:#2a3650;
+  --accent:#7aa2ff; --accent-soft:#1f2c4d; --ok:#4ade80; --ok-soft:#163626; --warn:#fbbf24; --warn-soft:#3a2c12;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 20px 60px;display:flex;flex-direction:column;gap:18px}
+
+/* topo */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
+.top h1{font-size:28px;font-weight:800;letter-spacing:-.01em}
+.top .sub{color:var(--muted);font-size:14px}
+.datebar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0e1420}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#0e1420}}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.danger{color:#b91c1c}
+.datebar input[type=date]{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 8px}
+.save{font-size:12px;color:var(--muted);min-width:110px;text-align:right}
+
+/* resumo */
+.summary{display:grid;grid-template-columns:minmax(220px,1.2fr) 3fr;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.big{display:flex;flex-direction:column;gap:6px}
+.big .num{font-family:var(--display);font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.big .lbl{color:var(--muted);font-size:13px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .3s}
+.stagecounts{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.sc{border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.sc b{display:block;font-family:var(--display);font-size:24px;font-variant-numeric:tabular-nums}
+.sc span{font-size:12.5px;color:var(--muted)}
+.sc.hot{border-color:var(--warn)}
+.sc.done{border-color:var(--ok)}
+.next{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:12px;border-top:1px dashed var(--line);font-size:14px}
+.next .tag{background:var(--warn-soft);color:var(--warn);font-weight:600;border-radius:6px;padding:2px 8px;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+
+.late{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--warn-soft);color:var(--ink);border:1px solid var(--warn);border-radius:10px;padding:10px 14px;font-size:14px}
+
+/* abas */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:flex-end}
+.tab{border:none;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.tabs .spacer{flex:1}
+.filter{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0}
+.chipf{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 10px;font-size:13px;display:flex;gap:6px;align-items:center}
+.chipf[aria-pressed="true"]{border-color:var(--ink);font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+
+/* quadro por etapa */
+.board{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;overflow-x:auto;padding-bottom:6px}
+.col{background:color-mix(in srgb,var(--surface) 55%,var(--bg));border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:160px}
+.col h3{font-size:15px;display:flex;justify-content:space-between;align-items:center;padding:2px 4px 4px}
+.col h3 small{font-family:var(--body);font-weight:600;color:var(--muted);font-size:13px}
+.col .empty{color:var(--muted);font-size:13px;padding:6px 4px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c,#888);border-radius:10px;padding:10px 10px 8px;display:flex;flex-direction:column;gap:6px;cursor:pointer;text-align:left;width:100%}
+.card:hover{border-color:var(--accent);border-left-color:var(--c)}
+.card .meta{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted)}
+.card .acc{font-weight:600;color:var(--ink)}
+.card .tema{font-size:14.5px;font-weight:500}
+.card .tema.vazio{color:var(--muted);font-style:italic;font-weight:400}
+.card.posted{opacity:.62}
+.card.posted .tema{text-decoration:line-through}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.step{border:1px solid var(--line);background:transparent;border-radius:6px;font-size:11.5px;padding:1px 7px;color:var(--muted);font-weight:500}
+.step.on{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.step.cur{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.fmt.opt{background:transparent;border:1px dashed var(--muted);color:var(--muted)}
+.fmt{font-size:11.5px;border-radius:5px;padding:0 6px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* por conta */
+.accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.acct{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;border-top:5px solid var(--c)}
+.acct header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.acct h2{font-size:18px}
+.acct .role{color:var(--muted);font-size:13px}
+.acct .count{font-family:var(--display);font-weight:800;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.acct .count small{font-family:var(--body);font-weight:500;font-size:12px;color:var(--muted)}
+.acct .list{display:flex;flex-direction:column;gap:8px}
+.acct .card{border-left-width:1px}
+
+/* gaveta */
+.scrim{position:fixed;inset:0;background:rgba(10,15,30,.4);display:none;z-index:10}
+.scrim.open{display:block}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:11;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer .head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.drawer .body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px;flex:1}
+.drawer .foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12.5px;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;width:100%}
+.field textarea{min-height:110px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bigsteps{display:flex;flex-direction:column;gap:6px}
+.bigstep{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.bigstep input{width:18px;height:18px;accent-color:var(--ok)}
+.bigstep.on{border-color:var(--ok);background:var(--ok-soft)}
+.hint{font-size:12.5px;color:var(--muted)}
+
+.accrow{display:grid;grid-template-columns:36px 1fr 1fr 64px 64px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
+.accrow .full{grid-column:2/-1}
+.accrow input[type=color]{width:36px;height:36px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}
+
+@media (max-width:900px){
+  .summary{grid-template-columns:1fr}
+  .stagecounts{grid-template-columns:repeat(3,1fr)}
+  .board{grid-template-columns:repeat(5,minmax(240px,82vw))}
+}
+@media (max-width:420px){
+  .wrap{padding:14px 16px 50px}
+  .top h1{font-size:23px}
+  .row2{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Painel do Social Media</h1>
+      <div class="sub" id="datelabel"></div>
+    </div>
+    <div class="datebar">
+      <button class="btn" id="prev" aria-label="Dia anterior">←</button>
+      <button class="btn" id="today">Hoje</button>
+      <input type="date" id="datepick" aria-label="Escolher dia">
+      <button class="btn" id="next" aria-label="Próximo dia">→</button>
+      <span class="save" id="save">Salvo neste navegador</span>
+    </div>
+  </div>
+
+  <section class="summary" aria-label="Resumo do dia">
+    <div class="big">
+      <span class="num" id="donenum">0/0</span>
+      <span class="lbl" id="donelbl">posts publicados hoje</span>
+      <div class="bar"><i id="donebar" style="width:0"></i></div>
+    </div>
+    <div class="stagecounts" id="stagecounts"></div>
+    <div class="next" id="nextbox"></div>
+  </section>
+
+  <div id="latebox"></div>
+
+  <div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-etapa" aria-selected="true">Por etapa</button>
+      <button class="tab" role="tab" id="tab-conta" aria-selected="false">Por conta</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="openaccounts">Contas e frequência</button>
+      <button class="btn primary" id="addpost">+ Novo post</button>
+    </div>
+    <div class="filter" id="filter"></div>
+  </div>
+
+  <main id="view"></main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Editor" aria-hidden="true">
+  <div class="head"><h2 id="dtitle" style="font-size:20px">Post</h2><button class="btn ghost" id="dclose" aria-label="Fechar">✕</button></div>
+  <div class="body" id="dbody"></div>
+  <div class="foot" id="dfoot"></div>
+</aside>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- etapas e formatos ---------- */
+const STAGES = [
+  {k:"pauta",  label:"Pauta",  col:"Falta pauta"},
+  {k:"copy",   label:"Copy",   col:"Falta copy"},
+  {k:"arte",   label:"Arte",   col:"Falta arte"},
+  {k:"video",  label:"Vídeo",  col:"Falta editar vídeo"},
+  {k:"postado",label:"Postado",col:"Pronto p/ postar"}
+];
+const FORMATS = {
+  "Carrossel": ["pauta","copy","arte","postado"],
+  "Estático":  ["pauta","copy","arte","postado"],
+  "Reels":     ["pauta","copy","video","arte","postado"],
+  "Vídeo":     ["pauta","copy","video","postado"],
+  "Stories":   ["pauta","arte","postado"]
+};
+const FORMAT_NOTES = {
+  "Reels":"Copy = roteiro + legenda · Arte = capa",
+  "Vídeo":"Copy = roteiro + legenda",
+  "Carrossel":"Copy = texto dos slides + legenda",
+  "Estático":"Copy = frase da arte + legenda",
+  "Stories":"Sem legenda"
+};
+const COLS = [
+  {k:"pauta", title:"Falta pauta"},
+  {k:"copy",  title:"Falta copy"},
+  {k:"midia", title:"Falta arte / vídeo"},
+  {k:"postar",title:"Pronto p/ postar"},
+  {k:"feito", title:"Postado"}
+];
+
+const DEFAULT_ACCOUNTS = [
+  {id:"luiz",   name:"Luiz Guedes",     role:"Mentor · Direito Bancário",        minDay:3, perDay:4, formatos:"Carrossel, Reels, Estático, Reels", color:"#1d4ed8"},
+  {id:"joao",   name:"João",            role:"Sócio · Guedes & Cruz",            minDay:1, perDay:1, formatos:"Carrossel", color:"#0f766e"},
+  {id:"diego",  name:"Diego",           role:"Sócio · Guedes & Cruz",            minDay:1, perDay:1, formatos:"Carrossel", color:"#7c3aed"},
+  {id:"gc",     name:"Guedes & Cruz",   role:"Escritório · Direito Bancário",    minDay:1, perDay:1, formatos:"Carrossel", color:"#334155"},
+  {id:"leoesc", name:"Leonardo",        role:"Escritório · Trabalhista Bancário",minDay:2, perDay:3, formatos:"Carrossel, Reels, Estático", color:"#c2410c"},
+  {id:"leomen", name:"Leonardo Mentor", role:"Mentoria",                         minDay:2, perDay:2, formatos:"Reels, Carrossel",     color:"#be123c"},
+  {id:"murilo", name:"Murilo",          role:"Conteúdo",                         minDay:1, perDay:1, formatos:"Reels",     color:"#a16207"}
+];
+
+/* ---------- estado ---------- */
+let accounts = load("accounts");
+let migrated = false;
+if(!accounts || !accounts.every(a=>"minDay" in a)){ migrated = !!accounts; accounts = DEFAULT_ACCOUNTS.map(a=>({...a})); store("accounts", accounts); }
+const days = {};           // cache dateKey -> posts[]
+let cur = todayKey();
+let view = loadPref("view") || "etapa";
+let accFilter = null;
+let editingId = null;
+
+let db = null, uid = null;
+
+function todayKey(){ const d=new Date(); return keyOf(d); }
+function keyOf(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function parseKey(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
+function shift(k,n){ const d=parseKey(k); d.setDate(d.getDate()+n); return keyOf(d); }
+function uidgen(){ return Math.random().toString(36).slice(2,10); }
+
+function load(k){ try{ const v=localStorage.getItem("smpainel:"+k); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function store(k,v){ try{ localStorage.setItem("smpainel:"+k, JSON.stringify(v)); }catch(e){} }
+function loadPref(k){ try{ return localStorage.getItem("smpainel:pref:"+k); }catch(e){ return null; } }
+function storePref(k,v){ try{ localStorage.setItem("smpainel:pref:"+k, v); }catch(e){} }
+
+function acc(id){ return accounts.find(a=>a.id===id) || {id, name:"Conta removida", role:"", color:"#888", formatos:"Carrossel", minDay:0, perDay:0}; }
+function fmtList(a){ const l=(a.formatos||"").split(",").map(s=>s.trim()).filter(s=>FORMATS[s]); return l.length?l:["Carrossel"]; }
+
+function generateDay(){
+  const posts=[];
+  accounts.forEach(a=>{
+    const f=fmtList(a);
+    const max=Math.max(+a.perDay||0, +a.minDay||0), min=Math.min(+a.minDay||0, max);
+    for(let i=0;i<max;i++){
+      const p=newPost(a.id, f[i%f.length]); if(i>=min) p.opcional=true; posts.push(p);
+    }
+  });
+  return posts;
+}
+function untouched(list){ return !list || list.every(p=>!p.tema && !p.notas && !p.link && !p.hora && !Object.values(p.done||{}).some(Boolean)); }
+function regenIfUntouched(k){ const l=load("day:"+k); if(l && untouched(l)){ days[k]=generateDay(); store("day:"+k, days[k]); return true; } return false; }
+function newPost(accId, formato){
+  return {id:uidgen(), acc:accId, tema:"", formato:formato||"Carrossel", hora:"", notas:"", link:"", done:{}};
+}
+function stagesOf(p){ return FORMATS[p.formato] || FORMATS["Carrossel"]; }
+function nextStage(p){ return stagesOf(p).find(s=>!p.done[s]) || null; }
+function colOf(p){
+  const n=nextStage(p);
+  if(!n) return "feito";
+  if(n==="pauta") return "pauta";
+  if(n==="copy") return "copy";
+  if(n==="arte"||n==="video") return "midia";
+  return "postar";
+}
+function stageLabel(k){ return (STAGES.find(s=>s.k===k)||{}).label || k; }
+
+function getDay(k){
+  if(!days[k]){
+    const cached = load("day:"+k);
+    days[k] = cached || null;
+  }
+  return days[k];
+}
+function ensureDay(k){
+  if(!getDay(k)){
+    // só gera automaticamente para hoje e dias futuros
+    days[k] = (k >= todayKey()) ? generateDay() : [];
+    persistDay(k);
+  }
+  return days[k];
+}
+
+/* ---------- salvar ---------- */
+const pending = {};
+let saveTimer=null;
+function setSave(t){ document.getElementById("save").textContent=t; }
+function persistDay(k){ store("day:"+k, days[k]); pending["day-"+k]={json:JSON.stringify(days[k])}; queue(); }
+function persistAccounts(){ store("accounts", accounts); pending["contas"]={json:JSON.stringify(accounts)}; queue(); }
+function queue(){
+  if(!db){ setSave("Salvo neste navegador"); return; }
+  setSave("Salvando…");
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(flush, 700);
+}
+async function flush(){
+  const keys=Object.keys(pending);
+  for(const k of keys){
+    const v=pending[k]; delete pending[k];
+    try{ await db.collection("data/users/"+uid).doc(k).set(v); }
+    catch(e){ setSave("Não salvou na nuvem — ficou neste navegador"); return; }
+  }
+  setSave("Salvo na sua conta");
+}
+function docData(s){ if(!s) return null; if(typeof s.data==="function") return s.data(); if(s.exists===false) return null; return s; }
+async function cloudGet(k){
+  if(!db) return null;
+  try{ const d=docData(await db.collection("data/users/"+uid).doc(k).get()); return d&&d.json?JSON.parse(d.json):null; }
+  catch(e){ return null; }
+}
+async function syncDay(k){
+  if(!db) return;
+  const remote = await cloudGet("day-"+k);
+  if(remote){ delete pending["day-"+k]; days[k]=remote; store("day:"+k, remote); render(); }
+  else if(days[k]){ persistDay(k); }
+}
+
+/* ---------- render ---------- */
+const $=id=>document.getElementById(id);
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function render(){
+  const posts = ensureDay(cur);
+  const d=parseKey(cur);
+  const label=d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"});
+  $("datelabel").textContent = (cur===todayKey()?"Hoje, ":"") + label;
+  $("datepick").value=cur;
+
+  // resumo
+  const total=posts.length, done=posts.filter(p=>!nextStage(p)).length;
+  $("donenum").textContent=done+"/"+total;
+  const req=posts.filter(p=>!p.opcional).length, reqDone=posts.filter(p=>!p.opcional&&!nextStage(p)).length;
+  $("donelbl").textContent = req<total ? `posts publicados · obrigatórios ${reqDone}/${req}, ${total-req} opcionais` : "posts publicados";
+  $("donebar").style.width = total? (done/total*100)+"%" : "0";
+  const counts={pauta:0,copy:0,arte:0,video:0,postar:0};
+  posts.forEach(p=>{
+    stagesOf(p).forEach(s=>{
+      if(!p.done[s]){
+        if(s==="postado"){ if(nextStage(p)==="postado") counts.postar++; }
+        else counts[s]++;
+      }
+    });
+  });
+  const items=[["pauta","pautas a definir"],["copy","copies a escrever"],["arte","artes a fazer"],["video","vídeos a editar"],["postar","prontos p/ postar"]];
+  $("stagecounts").innerHTML = items.map(([k,l])=>`<div class="sc ${k==="postar"?(counts[k]?"done":""):(counts[k]?"hot":"")}"><b>${counts[k]}</b><span>${l}</span></div>`).join("");
+
+  // próximo passo: primeiro post (por horário) com pendência, priorizando o que está mais avançado
+  const open=posts.filter(p=>nextStage(p)&&!p.opcional); if(!open.length) open.push(...posts.filter(p=>nextStage(p)));
+  open.sort((a,b)=> (a.hora||"99")<(b.hora||"99")?-1:(a.hora||"99")>(b.hora||"99")?1: stagesOf(b).filter(s=>b.done[s]).length - stagesOf(a).filter(s=>a.done[s]).length);
+  if(open.length){
+    const p=open[0], a=acc(p.acc), n=nextStage(p);
+    const verbo={pauta:"Definir a pauta",copy:"Escrever a copy",arte:"Fazer a arte",video:"Editar o vídeo",postado:"Publicar"}[n];
+    $("nextbox").innerHTML=`<span class="tag">Próximo passo</span><span><b>${verbo}</b> · ${esc(a.name)} · ${esc(p.formato)}${p.hora?" às "+esc(p.hora):""}${p.tema?" — "+esc(p.tema):""}</span><button class="btn" data-open="${p.id}">Abrir</button><button class="btn primary" data-tick="${p.id}" data-stage="${n}">Marcar ${stageLabel(n).toLowerCase()} como feito</button>`;
+  } else {
+    $("nextbox").innerHTML = total? `<span class="tag" style="background:var(--ok-soft);color:var(--ok)">Dia fechado</span><span>Todos os posts de hoje foram publicados.</span>` : `<span>Nenhum post neste dia.</span><button class="btn" id="gen">Gerar posts pela frequência das contas</button>`;
+  }
+
+  // atrasados do dia anterior
+  const yk=shift(cur,-1), yp=getDay(yk)||[];
+  const late=yp.filter(p=>nextStage(p) && !p.movido);
+  $("latebox").innerHTML = late.length ? `<div class="late"><b>${late.length} ${late.length>1?"posts ficaram":"post ficou"} pendente${late.length>1?"s":""} ontem</b><span>${late.map(p=>esc(acc(p.acc).name)).join(", ")}</span><button class="btn" id="bringlate">Trazer para este dia</button></div>` : "";
+
+  // abas e filtro
+  $("tab-etapa").setAttribute("aria-selected", view==="etapa");
+  $("tab-conta").setAttribute("aria-selected", view==="conta");
+  $("filter").innerHTML = `<button class="chipf" data-f="" aria-pressed="${!accFilter}">Todas as contas</button>` +
+    accounts.map(a=>{ const n=posts.filter(p=>p.acc===a.id).length; return `<button class="chipf" data-f="${a.id}" aria-pressed="${accFilter===a.id}"><span class="dot" style="background:${a.color}"></span>${esc(a.name)} <span style="color:var(--muted)">${n}</span></button>`; }).join("");
+
+  const shown = posts.filter(p=>!accFilter || p.acc===accFilter);
+  $("view").innerHTML = view==="etapa" ? renderBoard(shown) : renderAccounts(shown);
+}
+
+function cardHTML(p, showAcc=true){
+  const a=acc(p.acc), n=nextStage(p);
+  return `<div class="card ${n?"":"posted"}" style="--c:${a.color}" data-open="${p.id}" tabindex="0" role="button" aria-label="Abrir post de ${esc(a.name)}">
+    <div class="meta">${showAcc?`<span class="acc">${esc(a.name)}</span>`:"<span></span>"}<span>${p.opcional?`<span class="fmt opt">Opcional</span> `:""}<span class="fmt">${esc(p.formato)}</span>${p.hora?" · "+esc(p.hora):""}</span></div>
+    <div class="tema ${p.tema?"":"vazio"}">${p.tema?esc(p.tema):"Sem tema ainda"}</div>
+    <div class="steps">${stagesOf(p).map(s=>`<button class="step ${p.done[s]?"on":(s===n?"cur":"")}" data-tick="${p.id}" data-stage="${s}" aria-pressed="${!!p.done[s]}" title="${p.done[s]?"Desmarcar":"Marcar como feito"}">${p.done[s]?"✓ ":""}${stageLabel(s)}</button>`).join("")}</div>
+  </div>`;
+}
+function sortPosts(list){ return list.slice().sort((a,b)=>(a.hora||"99").localeCompare(b.hora||"99")); }
+function renderBoard(posts){
+  return `<div class="board">${COLS.map(c=>{
+    const list=sortPosts(posts.filter(p=>colOf(p)===c.k));
+    return `<section class="col" aria-label="${c.title}"><h3>${c.title}<small>${list.length}</small></h3>${list.length?list.map(p=>cardHTML(p)).join(""):`<div class="empty">Nada aqui</div>`}</section>`;
+  }).join("")}</div>`;
+}
+function renderAccounts(posts){
+  const list = accFilter? accounts.filter(a=>a.id===accFilter) : accounts;
+  return `<div class="accounts">${list.map(a=>{
+    const ps=sortPosts(posts.filter(p=>p.acc===a.id)); const d=ps.filter(p=>!nextStage(p)).length;
+    return `<section class="acct" style="--c:${a.color}"><header><div><h2>${esc(a.name)}</h2><div class="role">${esc(a.role)} · ${(+a.minDay||0)===(+a.perDay||0)?a.perDay:(a.minDay+" a "+a.perDay)} por dia</div></div><div class="count">${d}/${ps.length} <small>postados</small></div></header>
+      <div class="list">${ps.map(p=>cardHTML(p,false)).join("") || `<div class="hint">Nenhum post neste dia.</div>`}</div>
+      <button class="btn ghost" data-addfor="${a.id}" style="align-self:flex-start">+ Post para ${esc(a.name)}</button></section>`;
+  }).join("")}</div>`;
+}
+
+/* ---------- gaveta: post ---------- */
+function openPost(id){
+  const p=days[cur].find(x=>x.id===id); if(!p) return;
+  editingId=id;
+  $("dtitle").textContent="Post · "+acc(p.acc).name;
+  drawBody(p);
+  $("dfoot").innerHTML=`<button class="btn danger" id="delpost">Excluir post</button><span style="display:flex;gap:8px"><button class="btn" id="movetomorrow">Passar p/ amanhã</button><button class="btn primary" id="dclose2">Pronto</button></span>`;
+  openDrawer();
+}
+function drawBody(p){
+  $("dbody").innerHTML=`
+    <div class="row2">
+      <div class="field"><label for="f-acc">Conta</label><select id="f-acc">${accounts.map(a=>`<option value="${a.id}" ${a.id===p.acc?"selected":""}>${esc(a.name)}</option>`).join("")}</select></div>
+      <div class="field"><label for="f-fmt">Formato</label><select id="f-fmt">${Object.keys(FORMATS).map(f=>`<option ${f===p.formato?"selected":""}>${f}</option>`).join("")}</select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="f-hora">Horário de postar</label><input type="time" id="f-hora" value="${esc(p.hora)}"></div>
+      <div class="field"><label for="f-link">Link (Canva, Drive…)</label><input id="f-link" value="${esc(p.link)}" placeholder="cole o link aqui"></div>
+    </div>
+    <div class="field"><label for="f-tema">Tema / pauta</label><input id="f-tema" value="${esc(p.tema)}" placeholder="Ex.: Juros abusivos no cartão de crédito"></div>
+    <div class="field"><label>Etapas</label><div class="bigsteps">${stagesOf(p).map(s=>`<label class="bigstep ${p.done[s]?"on":""}"><input type="checkbox" data-st="${s}" ${p.done[s]?"checked":""}> ${stageLabel(s)}</label>`).join("")}</div><span class="hint">${esc(FORMAT_NOTES[p.formato]||"")}</span></div>
+    <div class="field"><label for="f-notas">Copy / legenda / roteiro</label><textarea id="f-notas" placeholder="Escreva ou cole a copy aqui">${esc(p.notas)}</textarea>
+      <button class="btn" id="copynotas" style="align-self:flex-start">Copiar texto</button></div>`;
+}
+function bindPostInputs(e){
+  if(!editingId) return;
+  const p=days[cur].find(x=>x.id===editingId); if(!p) return;
+  const t=e.target;
+  if(t.id==="f-tema") p.tema=t.value;
+  else if(t.id==="f-notas") p.notas=t.value;
+  else if(t.id==="f-hora") p.hora=t.value;
+  else if(t.id==="f-link") p.link=t.value;
+  else if(t.id==="f-acc") p.acc=t.value;
+  else if(t.id==="f-fmt"){ p.formato=t.value; drawBody(p); }
+  else if(t.dataset.st){ p.done[t.dataset.st]=t.checked; t.closest(".bigstep").classList.toggle("on",t.checked); }
+  else return;
+  persistDay(cur); render();
+}
+
+/* ---------- gaveta: contas ---------- */
+function openAccounts(){
+  editingId=null;
+  $("dtitle").textContent="Contas e frequência";
+  drawAccounts();
+  $("dfoot").innerHTML=`<button class="btn" id="addacc">+ Adicionar conta</button><button class="btn primary" id="dclose2">Pronto</button>`;
+  openDrawer();
+}
+function drawAccounts(){
+  $("dbody").innerHTML=`<p class="hint" style="margin:0">Mín/dia e máx/dia definem quantos posts aparecem (os acima do mínimo vêm marcados como opcionais). Os formatos definem o que aparece automaticamente a cada dia novo. Formatos em rodízio, separados por vírgula: ${Object.keys(FORMATS).join(", ")}.</p>`+
+  accounts.map((a,i)=>`<div class="accrow" data-i="${i}">
+    <input type="color" value="${a.color}" data-k="color" aria-label="Cor de ${esc(a.name)}">
+    <div class="field"><label for="an${i}">Nome</label><input id="an${i}" data-k="name" value="${esc(a.name)}"></div>
+    <div class="field"><label for="ar${i}">Descrição</label><input id="ar${i}" data-k="role" value="${esc(a.role)}"></div>
+    <div class="field"><label for="am${i}">Mín/dia</label><input id="am${i}" type="number" min="0" max="10" data-k="minDay" value="${a.minDay??a.perDay}"></div>
+    <div class="field"><label for="ap${i}">Máx/dia</label><input id="ap${i}" type="number" min="0" max="10" data-k="perDay" value="${a.perDay}"></div>
+    <div class="field full"><label for="af${i}">Formatos (rodízio)</label><input id="af${i}" data-k="formatos" value="${esc(a.formatos)}"></div>
+    <button class="btn ghost danger full" data-delacc="${i}" style="justify-self:start">Remover conta</button>
+  </div>`).join("");
+}
+function bindAccInputs(e){
+  const row=e.target.closest(".accrow"); if(!row||!e.target.dataset.k) return;
+  const a=accounts[+row.dataset.i]; const k=e.target.dataset.k;
+  a[k]= (k==="perDay"||k==="minDay") ? Math.max(0,+e.target.value||0) : e.target.value;
+  persistAccounts(); render();
+}
+
+function openDrawer(){ $("drawer").classList.add("open"); $("drawer").setAttribute("aria-hidden","false"); $("scrim").classList.add("open"); setTimeout(()=>{ const f=$("dbody").querySelector("input,select,textarea"); if(f&&editingId) $("f-tema").focus(); },50); }
+function closeDrawer(){ $("drawer").classList.remove("open"); $("drawer").setAttribute("aria-hidden","true"); $("scrim").classList.remove("open"); editingId=null; render(); }
+
+/* ---------- eventos ---------- */
+document.addEventListener("click", e=>{
+  const t=e.target.closest("button,[data-open]"); if(!t) return;
+  if(t.dataset.tick){
+    e.stopPropagation();
+    const p=days[cur].find(x=>x.id===t.dataset.tick); if(!p) return;
+    p.done[t.dataset.stage]=!p.done[t.dataset.stage]; persistDay(cur); render(); return;
+  }
+  if(t.dataset.open){ openPost(t.dataset.open); return; }
+  if(t.dataset.f!==undefined){ accFilter=t.dataset.f||null; render(); return; }
+  if(t.dataset.addfor){ const a=acc(t.dataset.addfor); const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); return; }
+  if(t.dataset.delacc!==undefined){ const i=+t.dataset.delacc; accounts.splice(i,1); persistAccounts(); drawAccounts(); render(); return; }
+  switch(t.id){
+    case "prev": cur=shift(cur,-1); go(); break;
+    case "next": cur=shift(cur,1); go(); break;
+    case "today": cur=todayKey(); go(); break;
+    case "tab-etapa": view="etapa"; storePref("view",view); render(); break;
+    case "tab-conta": view="conta"; storePref("view",view); render(); break;
+    case "addpost": { const a=accFilter?acc(accFilter):accounts[0]; const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); break; }
+    case "openaccounts": openAccounts(); break;
+    case "addacc": accounts.push({id:uidgen(),name:"Nova conta",role:"",minDay:1,perDay:1,formatos:"Carrossel",color:"#475569"}); persistAccounts(); drawAccounts(); render(); break;
+    case "dclose": case "dclose2": closeDrawer(); break;
+    case "gen": days[cur]=generateDay(); persistDay(cur); render(); break;
+    case "bringlate": {
+      const yk=shift(cur,-1); const yp=getDay(yk)||[];
+      yp.filter(p=>nextStage(p)&&!p.movido).forEach(p=>{ p.movido=cur; days[cur].push({...p, id:uidgen(), movido:undefined, done:{...p.done}}); });
+      persistDay(yk); persistDay(cur); render(); break;
+    }
+    case "delpost": {
+      if(t.dataset.confirm!=="1"){ t.dataset.confirm="1"; t.textContent="Clique de novo para excluir"; return; }
+      days[cur]=days[cur].filter(x=>x.id!==editingId); persistDay(cur); closeDrawer(); break;
+    }
+    case "movetomorrow": {
+      const p=days[cur].find(x=>x.id===editingId); if(!p) break;
+      const tk=shift(cur,1); ensureDay(tk);
+      days[tk].push({...p, id:uidgen()}); days[cur]=days[cur].filter(x=>x.id!==editingId);
+      persistDay(cur); persistDay(tk); closeDrawer(); break;
+    }
+    case "copynotas": {
+      const v=$("f-notas").value;
+      try{ navigator.clipboard.writeText(v).then(()=>{t.textContent="Copiado";},()=>{t.textContent="Selecione e copie manualmente";}); }catch(err){ t.textContent="Selecione e copie manualmente"; }
+      break;
+    }
+  }
+});
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape" && $("drawer").classList.contains("open")) closeDrawer();
+  if((e.key==="Enter"||e.key===" ") && e.target.classList && e.target.classList.contains("card")){ e.preventDefault(); openPost(e.target.dataset.open); }
+});
+$("scrim").addEventListener("click", closeDrawer);
+$("dbody").addEventListener("input", e=>{ editingId?bindPostInputs(e):bindAccInputs(e); });
+$("dbody").addEventListener("change", e=>{ if(e.target.tagName==="SELECT"||e.target.type==="checkbox") editingId?bindPostInputs(e):null; });
+$("datepick").addEventListener("change", e=>{ if(e.target.value){ cur=e.target.value; go(); } });
+
+function go(){ render(); syncDay(cur); syncDay(shift(cur,-1)); }
+
+if(migrated) regenIfUntouched(cur);
+render();
+
+/* ---------- nuvem (opcional) ---------- */
+(async function(){
+  try{
+    if(!window.claude || !window.claude.use) return;
+    const [d,u]=await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if(!d||!u) return;
+    const id=await u.id(); if(!id) return;
+    db=d; uid=id;
+    const remoteAcc = await cloudGet("contas");
+    let cloudOld=false;
+    if(remoteAcc&&remoteAcc.length&&remoteAcc.every(a=>"minDay" in a)){ accounts=remoteAcc; store("accounts",accounts); }
+    else { cloudOld=!!(remoteAcc&&remoteAcc.length); persistAccounts(); }
+    await Promise.all([syncDay(cur), syncDay(shift(cur,-1))]);
+    if((cloudOld||migrated) && untouched(days[cur])){ days[cur]=generateDay(); persistDay(cur); }
+    render(); setSave("Salvo na sua conta");
+  }catch(e){ /* segue só no navegador */ }
+})();
+})();
+</script>
+</body>
+</html>
