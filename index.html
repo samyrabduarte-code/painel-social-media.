@@ -116,7 +116,7 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 /* gaveta */
 .scrim{position:fixed;inset:0;background:rgba(10,15,30,.4);display:none;z-index:10}
 .scrim.open{display:block}
-.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:11;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:11;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column}
 .drawer.open{transform:none}
 .drawer .head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .drawer .body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px;flex:1}
@@ -130,6 +130,17 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 .bigstep{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
 .bigstep input{width:18px;height:18px;accent-color:var(--ok)}
 .bigstep.on{border-color:var(--ok);background:var(--ok-soft)}
+.tpanel{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:10px;padding:0 12px 12px;background:color-mix(in srgb,var(--accent-soft) 35%,var(--surface))}
+.ttabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 -12px;padding:0 8px}
+.ttab{border:none;background:none;padding:10px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.ttab[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
+.ttab .filled{color:var(--ok);font-size:10px;vertical-align:middle}
+.field textarea.tall{min-height:220px;background:var(--surface);line-height:1.5}
+.lmeta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lmeta .warn{color:var(--warn);font-weight:600}.lmeta .bad{color:#b91c1c;font-weight:600}
+.igprev{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.igprev .iglbl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin-bottom:4px}
+.igprev .more{color:var(--muted)}
 .hint{font-size:12.5px;color:var(--muted)}
 
 .accrow{display:grid;grid-template-columns:36px 1fr 1fr 64px 64px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -447,15 +458,46 @@ function drawBody(p){
     </div>
     <div class="field"><label for="f-tema">Tema / pauta</label><input id="f-tema" value="${esc(p.tema)}" placeholder="Ex.: Juros abusivos no cartão de crédito"></div>
     <div class="field"><label>Etapas</label><div class="bigsteps">${stagesOf(p).map(s=>`<label class="bigstep ${p.done[s]?"on":""}"><input type="checkbox" data-st="${s}" ${p.done[s]?"checked":""}> ${stageLabel(s)}</label>`).join("")}</div><span class="hint">${esc(FORMAT_NOTES[p.formato]||"")}</span></div>
-    <div class="field"><label for="f-notas">Copy / legenda / roteiro</label><textarea id="f-notas" placeholder="Escreva ou cole a copy aqui">${esc(p.notas)}</textarea>
-      <button class="btn" id="copynotas" style="align-self:flex-start">Copiar texto</button></div>`;
+    ${textPanel(p)}`;
 }
+let textTab="legenda";
+function isVideo(p){ return p.formato==="Reels"||p.formato==="Vídeo"; }
+function textPanel(p){
+  const t1 = isVideo(p) ? "Roteiro" : (p.formato==="Stories" ? "Texto do story" : "Texto da arte");
+  const tabs = p.formato==="Stories" ? [["texto",t1]] : [["legenda","Legenda"],["texto",t1]];
+  if(!tabs.some(([k])=>k===textTab)) textTab=tabs[0][0];
+  const head = `<div class="ttabs" role="tablist">${tabs.map(([k,l])=>`<button class="ttab" role="tab" data-ttab="${k}" aria-selected="${k===textTab}">${l}${(k==="legenda"?p.legenda:p.notas)?' <span class="filled" aria-label="preenchido">●</span>':""}</button>`).join("")}</div>`;
+  if(textTab==="texto"){
+    return `<div class="tpanel">${head}
+      <div class="field"><label for="f-notas">${t1}</label><textarea id="f-notas" class="tall" placeholder="${isVideo(p)?"Gancho, desenvolvimento e chamada para ação":"Texto que vai na arte, slide por slide"}">${esc(p.notas)}</textarea></div>
+      <button class="btn" data-copy="f-notas" style="align-self:flex-start">Copiar ${t1.toLowerCase()}</button></div>`;
+  }
+  return `<div class="tpanel">${head}
+    <div class="field"><label for="f-legenda">Legenda do Instagram</label><textarea id="f-legenda" class="tall" placeholder="Primeira linha é o gancho: é o que aparece antes do “mais”.">${esc(p.legenda||"")}</textarea>
+    <div class="lmeta" id="lmeta">${legendaMeta(p.legenda||"")}</div></div>
+    <div class="igprev" aria-label="Prévia no feed"><span class="iglbl">Como aparece no feed</span><div id="igprev">${legendaPreview(p)}</div></div>
+    <button class="btn" data-copy="f-legenda" style="align-self:flex-start">Copiar legenda</button></div>`;
+}
+function legendaMeta(v){
+  const n=[...v].length, h=(v.match(/#[\p{L}\p{N}_]+/gu)||[]).length;
+  const cls=n>2200?"bad":(n>2000?"warn":"");
+  return `<span class="${cls}">${n.toLocaleString("pt-BR")} / 2.200 caracteres</span><span class="${h>30?"bad":""}">${h} hashtag${h===1?"":"s"} (máx. 30)</span>`;
+}
+function legendaPreview(p){
+  const v=(p.legenda||"").trim();
+  if(!v) return `<span class="hint">A legenda aparece aqui enquanto você escreve.</span>`;
+  const first=v.split("\n")[0]; const cut=[...first].slice(0,125).join("");
+  const more = v.length>cut.length;
+  return `<b>${esc(handle(acc(p.acc).name))}</b> ${esc(cut)}${more?'<span class="more">… mais</span>':""}`;
+}
+function handle(n){ return n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,""); }
 function bindPostInputs(e){
   if(!editingId) return;
   const p=days[cur].find(x=>x.id===editingId); if(!p) return;
   const t=e.target;
   if(t.id==="f-tema") p.tema=t.value;
   else if(t.id==="f-notas") p.notas=t.value;
+  else if(t.id==="f-legenda"){ p.legenda=t.value; $("lmeta").innerHTML=legendaMeta(t.value); $("igprev").innerHTML=legendaPreview(p); }
   else if(t.id==="f-hora") p.hora=t.value;
   else if(t.id==="f-link") p.link=t.value;
   else if(t.id==="f-acc") p.acc=t.value;
@@ -504,6 +546,11 @@ document.addEventListener("click", e=>{
     p.done[t.dataset.stage]=!p.done[t.dataset.stage]; persistDay(cur); render(); return;
   }
   if(t.dataset.open){ openPost(t.dataset.open); return; }
+  if(t.dataset.ttab){ textTab=t.dataset.ttab; const p=days[cur].find(x=>x.id===editingId); if(p) drawBody(p); return; }
+  if(t.dataset.copy){ const v=($(t.dataset.copy)||{}).value||""; const lbl=t.textContent;
+    const done=m=>{ t.textContent=m; setTimeout(()=>{t.textContent=lbl;},1800); };
+    try{ navigator.clipboard.writeText(v).then(()=>done("Copiado ✓"),()=>done("Selecione e copie manualmente")); }catch(err){ done("Selecione e copie manualmente"); }
+    return; }
   if(t.dataset.f!==undefined){ accFilter=t.dataset.f||null; render(); return; }
   if(t.dataset.addfor){ const a=acc(t.dataset.addfor); const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); return; }
   if(t.dataset.delacc!==undefined){ const i=+t.dataset.delacc; accounts.splice(i,1); persistAccounts(); drawAccounts(); render(); return; }
@@ -532,11 +579,6 @@ document.addEventListener("click", e=>{
       const tk=shift(cur,1); ensureDay(tk);
       days[tk].push({...p, id:uidgen()}); days[cur]=days[cur].filter(x=>x.id!==editingId);
       persistDay(cur); persistDay(tk); closeDrawer(); break;
-    }
-    case "copynotas": {
-      const v=$("f-notas").value;
-      try{ navigator.clipboard.writeText(v).then(()=>{t.textContent="Copiado";},()=>{t.textContent="Selecione e copie manualmente";}); }catch(err){ t.textContent="Selecione e copie manualmente"; }
-      break;
     }
   }
 });
