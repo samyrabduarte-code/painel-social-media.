@@ -141,6 +141,20 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 .igprev{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
 .igprev .iglbl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin-bottom:4px}
 .igprev .more{color:var(--muted)}
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;border:2px dashed var(--line);border-radius:10px;padding:22px 12px;background:var(--surface);cursor:pointer;font-size:14px}
+.drop span{font-size:12.5px;color:var(--muted)}
+.drop:hover,.drop.over,.drop:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+.refgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.refgrid:empty{display:none}
+.refimg{position:relative;margin:0;aspect-ratio:4/5;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
+.refzoom{border:none;padding:0;width:100%;height:100%;background:none;cursor:zoom-in}
+.refzoom img{width:100%;height:100%;object-fit:cover;display:block}
+.refdel{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(15,20,35,.75);color:#fff;font-size:12px}
+.reflink{font-size:13.5px;color:var(--accent);font-weight:600}
+.refpill{align-self:flex-start;font-size:11px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:5px;padding:0 6px}
+.zoom{position:fixed;inset:0;background:rgba(5,8,15,.88);z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+.zoom.open{display:flex}
+.zoom img{max-width:100%;max-height:calc(100% - 70px);border-radius:8px}
 .hint{font-size:12.5px;color:var(--muted)}
 
 .accrow{display:grid;grid-template-columns:36px 1fr 1fr 64px 64px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -203,6 +217,7 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 </div>
 
 <div class="scrim" id="scrim"></div>
+<div class="zoom" id="zoom" role="dialog" aria-label="Imagem de referência"><img id="zoomimg" alt="Referência ampliada"><button class="btn" id="zoomclose">Fechar</button></div>
 <aside class="drawer" id="drawer" aria-label="Editor" aria-hidden="true">
   <div class="head"><h2 id="dtitle" style="font-size:20px">Post</h2><button class="btn ghost" id="dclose" aria-label="Fechar">✕</button></div>
   <div class="body" id="dbody"></div>
@@ -416,7 +431,7 @@ function cardHTML(p, showAcc=true){
   const a=acc(p.acc), n=nextStage(p);
   return `<div class="card ${n?"":"posted"}" style="--c:${a.color}" data-open="${p.id}" tabindex="0" role="button" aria-label="Abrir post de ${esc(a.name)}">
     <div class="meta">${showAcc?`<span class="acc">${esc(a.name)}</span>`:"<span></span>"}<span>${p.opcional?`<span class="fmt opt">Opcional</span> `:""}<span class="fmt">${esc(p.formato)}</span>${p.hora?" · "+esc(p.hora):""}</span></div>
-    <div class="tema ${p.tema?"":"vazio"}">${p.tema?esc(p.tema):"Sem tema ainda"}</div>
+    ${p.temRef?`<span class="refpill">Tem referência</span>`:""}<div class="tema ${p.tema?"":"vazio"}">${p.tema?esc(p.tema):"Sem tema ainda"}</div>
     <div class="steps">${stagesOf(p).map(s=>`<button class="step ${p.done[s]?"on":(s===n?"cur":"")}" data-tick="${p.id}" data-stage="${s}" aria-pressed="${!!p.done[s]}" title="${p.done[s]?"Desmarcar":"Marcar como feito"}">${p.done[s]?"✓ ":""}${stageLabel(s)}</button>`).join("")}</div>
   </div>`;
 }
@@ -464,9 +479,24 @@ let textTab="legenda";
 function isVideo(p){ return p.formato==="Reels"||p.formato==="Vídeo"; }
 function textPanel(p){
   const t1 = isVideo(p) ? "Roteiro" : (p.formato==="Stories" ? "Texto do story" : "Texto da arte");
-  const tabs = p.formato==="Stories" ? [["texto",t1]] : [["legenda","Legenda"],["texto",t1]];
+  const tabs = (p.formato==="Stories" ? [["texto",t1]] : [["legenda","Legenda"],["texto",t1]]).concat([["ref","Referência"]]);
   if(!tabs.some(([k])=>k===textTab)) textTab=tabs[0][0];
-  const head = `<div class="ttabs" role="tablist">${tabs.map(([k,l])=>`<button class="ttab" role="tab" data-ttab="${k}" aria-selected="${k===textTab}">${l}${(k==="legenda"?p.legenda:p.notas)?' <span class="filled" aria-label="preenchido">●</span>':""}</button>`).join("")}</div>`;
+  const head = `<div class="ttabs" role="tablist">${tabs.map(([k,l])=>`<button class="ttab" role="tab" data-ttab="${k}" aria-selected="${k===textTab}">${l}${(k==="legenda"?p.legenda:k==="ref"?p.temRef:p.notas)?' <span class="filled" aria-label="preenchido">●</span>':""}</button>`).join("")}</div>`;
+  if(textTab==="ref"){
+    const rf=getRef(p);
+    return `<div class="tpanel">${head}
+      <label class="drop" id="drop" for="f-refimg" tabindex="0">
+        <b>Cole a imagem aqui (Ctrl+V)</b>
+        <span>ou arraste a imagem para cá, ou clique para escolher um arquivo</span>
+      </label>
+      <input type="file" id="f-refimg" accept="image/*" multiple hidden>
+      <div class="refgrid" id="refgrid">${refGrid(rf)}</div>
+      <div class="field"><label for="f-reflink">Link da referência</label><input id="f-reflink" value="${esc(rf.link)}" placeholder="post do Instagram, TikTok, Pinterest…"></div>
+      ${rf.link && /^https?:\/\//.test(rf.link) ? `<a class="reflink" href="${esc(rf.link)}" target="_blank" rel="noopener">Abrir link da referência ↗</a>` : ""}
+      <div class="field"><label for="f-refobs">O que aproveitar da referência</label><textarea id="f-refobs" placeholder="Ex.: usar o mesmo estilo de capa, a ordem dos slides, o gancho…">${esc(rf.obs)}</textarea></div>
+      <span class="hint" id="refmsg">Até ${MAXREF} imagens por post. As imagens são reduzidas para ocupar menos espaço.</span>
+    </div>`;
+  }
   if(textTab==="texto"){
     return `<div class="tpanel">${head}
       <div class="field"><label for="f-notas">${t1}</label><textarea id="f-notas" class="tall" placeholder="${isVideo(p)?"Gancho, desenvolvimento e chamada para ação":"Texto que vai na arte, slide por slide"}">${esc(p.notas)}</textarea></div>
@@ -478,6 +508,45 @@ function textPanel(p){
     <div class="igprev" aria-label="Prévia no feed"><span class="iglbl">Como aparece no feed</span><div id="igprev">${legendaPreview(p)}</div></div>
     <button class="btn" data-copy="f-legenda" style="align-self:flex-start">Copiar legenda</button></div>`;
 }
+const MAXREF=6;
+const refs={};
+function refKey(p){ return p.refId||p.id; }
+function getRef(p){
+  const k=refKey(p);
+  if(!refs[k]){ refs[k]=load("ref:"+k)||{imgs:[],link:"",obs:""}; if(db) cloudGet("ref-"+k).then(r=>{ if(r){ refs[k]=r; store("ref:"+k,r); if(editingId===p.id&&textTab==="ref") drawBody(p); } }); }
+  return refs[k];
+}
+function saveRef(p){
+  p.refId=refKey(p); const rf=refs[p.refId];
+  p.temRef=!!(rf.imgs.length||rf.link||rf.obs);
+  let ok=true;
+  try{ localStorage.setItem("smpainel:ref:"+p.refId, JSON.stringify(rf)); }catch(e){ ok=false; }
+  pending["ref-"+p.refId]={json:JSON.stringify(rf)}; queue();
+  persistDay(cur);
+  if(!ok && !db){ const m=$("refmsg"); if(m){ m.textContent="O navegador ficou sem espaço para imagens. Apague referências de posts antigos."; m.style.color="#b91c1c"; } }
+}
+function refGrid(rf){
+  return rf.imgs.map((src,i)=>`<figure class="refimg"><button class="refzoom" data-zoom="${i}" aria-label="Ampliar imagem ${i+1}"><img src="${src}" alt="Referência ${i+1}"></button><button class="refdel" data-delref="${i}" aria-label="Remover imagem ${i+1}">✕</button></figure>`).join("");
+}
+function compress(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>{ const im=new Image(); im.onload=()=>{
+      const max=1000, sc=Math.min(1,max/Math.max(im.width,im.height));
+      const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
+      const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+      res(c.toDataURL("image/jpeg",0.72)); }; im.onerror=rej; im.src=fr.result; };
+    fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+async function addRefFiles(files){
+  const p=editingId&&days[cur].find(x=>x.id===editingId); if(!p) return;
+  const rf=getRef(p); const imgs=[...files].filter(f=>f.type&&f.type.startsWith("image/"));
+  if(!imgs.length){ const m=$("refmsg"); if(m) m.textContent="Isso não é uma imagem. Copie a imagem (botão direito → Copiar imagem) e cole aqui."; return; }
+  for(const f of imgs){ if(rf.imgs.length>=MAXREF) break; try{ rf.imgs.push(await compress(f)); }catch(e){} }
+  saveRef(p); $("refgrid").innerHTML=refGrid(rf); render();
+}
+function openZoom(src){ $("zoomimg").src=src; $("zoom").classList.add("open"); }
 function legendaMeta(v){
   const n=[...v].length, h=(v.match(/#[\p{L}\p{N}_]+/gu)||[]).length;
   const cls=n>2200?"bad":(n>2000?"warn":"");
@@ -497,6 +566,8 @@ function bindPostInputs(e){
   const t=e.target;
   if(t.id==="f-tema") p.tema=t.value;
   else if(t.id==="f-notas") p.notas=t.value;
+  else if(t.id==="f-reflink"||t.id==="f-refobs"){ const rf=getRef(p); rf[t.id==="f-reflink"?"link":"obs"]=t.value; saveRef(p); return; }
+  else if(t.id==="f-refimg"){ if(e.type==="change"){ addRefFiles(t.files); t.value=""; } return; }
   else if(t.id==="f-legenda"){ p.legenda=t.value; $("lmeta").innerHTML=legendaMeta(t.value); $("igprev").innerHTML=legendaPreview(p); }
   else if(t.id==="f-hora") p.hora=t.value;
   else if(t.id==="f-link") p.link=t.value;
@@ -546,6 +617,9 @@ document.addEventListener("click", e=>{
     p.done[t.dataset.stage]=!p.done[t.dataset.stage]; persistDay(cur); render(); return;
   }
   if(t.dataset.open){ openPost(t.dataset.open); return; }
+  if(t.dataset.zoom!==undefined){ const p=days[cur].find(x=>x.id===editingId); if(p) openZoom(getRef(p).imgs[+t.dataset.zoom]); return; }
+  if(t.dataset.delref!==undefined){ const p=days[cur].find(x=>x.id===editingId); if(!p) return; const rf=getRef(p); rf.imgs.splice(+t.dataset.delref,1); saveRef(p); $("refgrid").innerHTML=refGrid(rf); render(); return; }
+  if(t.id==="zoomclose"||t.id==="zoom"){ $("zoom").classList.remove("open"); return; }
   if(t.dataset.ttab){ textTab=t.dataset.ttab; const p=days[cur].find(x=>x.id===editingId); if(p) drawBody(p); return; }
   if(t.dataset.copy){ const v=($(t.dataset.copy)||{}).value||""; const lbl=t.textContent;
     const done=m=>{ t.textContent=m; setTimeout(()=>{t.textContent=lbl;},1800); };
@@ -582,13 +656,23 @@ document.addEventListener("click", e=>{
     }
   }
 });
+document.addEventListener("paste", e=>{
+  if(!editingId || textTab!=="ref" || !$("drawer").classList.contains("open")) return;
+  const files=[...(e.clipboardData&&e.clipboardData.files||[])];
+  if(files.length){ e.preventDefault(); addRefFiles(files); }
+  else if(document.activeElement && document.activeElement.id==="drop"){ const m=$("refmsg"); if(m) m.textContent="Não veio imagem no que você colou. No Instagram, abra a imagem, clique com o botão direito → Copiar imagem, ou tire um print (Win+Shift+S)."; }
+});
+document.addEventListener("dragover", e=>{ const d=e.target.closest&&e.target.closest("#drop"); if(d){ e.preventDefault(); d.classList.add("over"); } });
+document.addEventListener("dragleave", e=>{ const d=e.target.closest&&e.target.closest("#drop"); if(d) d.classList.remove("over"); });
+document.addEventListener("drop", e=>{ const d=e.target.closest&&e.target.closest("#drop"); if(d){ e.preventDefault(); d.classList.remove("over"); addRefFiles(e.dataTransfer.files); } });
 document.addEventListener("keydown", e=>{
+  if(e.key==="Escape" && $("zoom").classList.contains("open")){ $("zoom").classList.remove("open"); return; }
   if(e.key==="Escape" && $("drawer").classList.contains("open")) closeDrawer();
   if((e.key==="Enter"||e.key===" ") && e.target.classList && e.target.classList.contains("card")){ e.preventDefault(); openPost(e.target.dataset.open); }
 });
 $("scrim").addEventListener("click", closeDrawer);
 $("dbody").addEventListener("input", e=>{ editingId?bindPostInputs(e):bindAccInputs(e); });
-$("dbody").addEventListener("change", e=>{ if(e.target.tagName==="SELECT"||e.target.type==="checkbox") editingId?bindPostInputs(e):null; });
+$("dbody").addEventListener("change", e=>{ if(e.target.id==="f-refimg"){ bindPostInputs(e); return; } if(e.target.tagName==="SELECT"||e.target.type==="checkbox") editingId?bindPostInputs(e):null; });
 $("datepick").addEventListener("change", e=>{ if(e.target.value){ cur=e.target.value; go(); } });
 
 function go(){ render(); syncDay(cur); syncDay(shift(cur,-1)); }
