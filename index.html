@@ -259,12 +259,12 @@ const COLS = [
 ];
 
 const DEFAULT_ACCOUNTS = [
-  {id:"luiz",   name:"Luiz Guedes",     role:"Mentor · Direito Bancário",        minDay:3, perDay:4, formatos:"Carrossel, Reels, Estático, Reels", color:"#1d4ed8"},
+  {id:"luiz",   name:"Luiz Guedes",     role:"Mentor · Direito Bancário",        minDay:4, perDay:4, formatos:"Carrossel, Reels, Estático, Reels", color:"#1d4ed8"},
   {id:"joao",   name:"João",            role:"Sócio · Guedes & Cruz",            minDay:1, perDay:1, formatos:"Carrossel", color:"#0f766e"},
   {id:"diego",  name:"Diego",           role:"Sócio · Guedes & Cruz",            minDay:1, perDay:1, formatos:"Carrossel", color:"#7c3aed"},
-  {id:"gc",     name:"Guedes & Cruz",   role:"Escritório · Direito Bancário",    minDay:1, perDay:1, formatos:"Carrossel", color:"#334155"},
-  {id:"leoesc", name:"Leonardo",        role:"Escritório · Trabalhista Bancário",minDay:2, perDay:3, formatos:"Carrossel, Reels, Estático", color:"#c2410c"},
-  {id:"leomen", name:"Leonardo Mentor", role:"Mentoria",                         minDay:2, perDay:2, formatos:"Reels, Carrossel",     color:"#be123c"},
+  {id:"gc",     name:"Guedes & Cruz",   role:"Escritório · Direito Bancário",    minDay:4, perDay:4, formatos:"Carrossel, Reels, Estático, Carrossel", color:"#334155"},
+  {id:"leoesc", name:"Leonardo",        role:"Escritório · Trabalhista Bancário",minDay:4, perDay:4, formatos:"Carrossel, Reels, Estático, Carrossel", color:"#c2410c"},
+  {id:"leomen", name:"Leonardo Mentor", role:"Mentoria",                         minDay:3, perDay:3, formatos:"Reels, Carrossel, Reels",     color:"#be123c"},
   {id:"murilo", name:"Murilo",          role:"Conteúdo",                         minDay:1, perDay:1, formatos:"Reels",     color:"#a16207"}
 ];
 
@@ -583,7 +583,7 @@ function openAccounts(){
   editingId=null;
   $("dtitle").textContent="Contas e frequência";
   drawAccounts();
-  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 11/11</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
+  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 11/11 · 2</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
   openDrawer();
 }
 function drawAccounts(){
@@ -703,7 +703,16 @@ $("datepick").addEventListener("change", e=>{ if(e.target.value){ cur=e.target.v
 
 function go(){ render(); syncDay(cur); syncDay(shift(cur,-1)); }
 
+const FREQ_V3={luiz:4, gc:4, leoesc:4, leomen:3, joao:1, diego:1, murilo:1};
+function migrateFreqV3(list){
+  let ch=false;
+  list.forEach(a=>{ if(FREQ_V3[a.id]!==undefined && (a.v||0)<3){
+    const d=DEFAULT_ACCOUNTS.find(x=>x.id===a.id);
+    a.minDay=a.perDay=FREQ_V3[a.id]; if(d) a.formatos=d.formatos; a.v=3; ch=true; } });
+  return ch;
+}
 if(migrated) regenIfUntouched(cur);
+if(migrateFreqV3(accounts)){ store("accounts",accounts); applyAccountsToDays(); }
 render();
 
 /* ---------- nuvem (opcional) ---------- */
@@ -720,6 +729,7 @@ render();
     else { cloudOld=!!(remoteAcc&&remoteAcc.length); persistAccounts(); }
     await Promise.all([syncDay(cur), syncDay(shift(cur,-1))]);
     if((cloudOld||migrated) && untouched(days[cur])){ days[cur]=generateDay(); persistDay(cur); }
+    if(migrateFreqV3(accounts)){ persistAccounts(); applyAccountsToDays(); }
     render(); setSave("Salvo na sua conta");
   }catch(e){ /* segue só no navegador */ }
 })();
