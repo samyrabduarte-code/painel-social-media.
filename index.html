@@ -587,7 +587,7 @@ function openAccounts(){
   openDrawer();
 }
 function drawAccounts(){
-  $("dbody").innerHTML=`<p class="hint" style="margin:0">Mín/dia e máx/dia definem quantos posts aparecem (os acima do mínimo vêm marcados como opcionais). Os formatos definem o que aparece automaticamente a cada dia novo. Formatos em rodízio, separados por vírgula: ${Object.keys(FORMATS).join(", ")}.</p>`+
+  $("dbody").innerHTML=`<p class="hint" style="margin:0">Mín/dia e máx/dia definem quantos posts aparecem hoje e nos próximos dias (posts que você já começou nunca são apagados). Os posts acima do mínimo vêm marcados como opcionais. Os formatos definem o que aparece automaticamente a cada dia novo. Formatos em rodízio, separados por vírgula: ${Object.keys(FORMATS).join(", ")}.</p>`+
   accounts.map((a,i)=>`<div class="accrow" data-i="${i}">
     <input type="color" value="${a.color}" data-k="color" aria-label="Cor de ${esc(a.name)}">
     <div class="field"><label for="an${i}">Nome</label><input id="an${i}" data-k="name" value="${esc(a.name)}"></div>
@@ -602,7 +602,30 @@ function bindAccInputs(e){
   const row=e.target.closest(".accrow"); if(!row||!e.target.dataset.k) return;
   const a=accounts[+row.dataset.i]; const k=e.target.dataset.k;
   a[k]= (k==="perDay"||k==="minDay") ? Math.max(0,+e.target.value||0) : e.target.value;
-  persistAccounts(); render();
+  persistAccounts();
+  if(k==="perDay"||k==="minDay"||k==="formatos") applyAccountsToDays();
+  render();
+}
+/* Aplica a frequência das contas a hoje e aos dias futuros já abertos:
+   cria os posts que faltam e tira só os posts ainda vazios que sobraram. */
+function isEmptyPost(p){ return !p.tema && !p.notas && !p.legenda && !p.link && !p.hora && !p.temRef && !Object.values(p.done||{}).some(Boolean); }
+function syncDayToAccounts(list){
+  let changed=false;
+  accounts.forEach(a=>{
+    const f=fmtList(a), max=Math.max(+a.perDay||0,+a.minDay||0), min=Math.min(+a.minDay||0,max);
+    let mine=list.filter(p=>p.acc===a.id);
+    while(mine.length<max){ const p=newPost(a.id, f[mine.length%f.length]); list.push(p); mine.push(p); changed=true; }
+    for(let i=mine.length-1;i>=0 && mine.length>max;i--){ if(isEmptyPost(mine[i])){ list.splice(list.indexOf(mine[i]),1); mine.splice(i,1); changed=true; } }
+    mine.forEach((p,i)=>{ const o=i>=min; if(!!p.opcional!==o){ p.opcional=o; changed=true; } if(isEmptyPost(p) && p.formato!==f[i%f.length]){ p.formato=f[i%f.length]; changed=true; } });
+  });
+  const ids=new Set(accounts.map(a=>a.id));
+  for(let i=list.length-1;i>=0;i--){ if(!ids.has(list[i].acc) && isEmptyPost(list[i])){ list.splice(i,1); changed=true; } }
+  return changed;
+}
+function applyAccountsToDays(){
+  const t=todayKey(); const keys=new Set(Object.keys(days));
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith("smpainel:day:")) keys.add(k.slice(13)); } }catch(e){}
+  keys.forEach(k=>{ if(k<t) return; const list=getDay(k); if(list && syncDayToAccounts(list)) persistDay(k); });
 }
 
 function openDrawer(){ $("drawer").classList.add("open"); $("drawer").setAttribute("aria-hidden","false"); $("scrim").classList.add("open"); setTimeout(()=>{ const f=$("dbody").querySelector("input,select,textarea"); if(f&&editingId) $("f-tema").focus(); },50); }
@@ -627,7 +650,7 @@ document.addEventListener("click", e=>{
     return; }
   if(t.dataset.f!==undefined){ accFilter=t.dataset.f||null; render(); return; }
   if(t.dataset.addfor){ const a=acc(t.dataset.addfor); const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); return; }
-  if(t.dataset.delacc!==undefined){ const i=+t.dataset.delacc; accounts.splice(i,1); persistAccounts(); drawAccounts(); render(); return; }
+  if(t.dataset.delacc!==undefined){ const i=+t.dataset.delacc; accounts.splice(i,1); persistAccounts(); applyAccountsToDays(); drawAccounts(); render(); return; }
   switch(t.id){
     case "prev": cur=shift(cur,-1); go(); break;
     case "next": cur=shift(cur,1); go(); break;
@@ -636,7 +659,7 @@ document.addEventListener("click", e=>{
     case "tab-conta": view="conta"; storePref("view",view); render(); break;
     case "addpost": { const a=accFilter?acc(accFilter):accounts[0]; const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); break; }
     case "openaccounts": openAccounts(); break;
-    case "addacc": accounts.push({id:uidgen(),name:"Nova conta",role:"",minDay:1,perDay:1,formatos:"Carrossel",color:"#475569"}); persistAccounts(); drawAccounts(); render(); break;
+    case "addacc": accounts.push({id:uidgen(),name:"Nova conta",role:"",minDay:1,perDay:1,formatos:"Carrossel",color:"#475569"}); persistAccounts(); applyAccountsToDays(); drawAccounts(); render(); break;
     case "dclose": case "dclose2": closeDrawer(); break;
     case "gen": days[cur]=generateDay(); persistDay(cur); render(); break;
     case "bringlate": {
