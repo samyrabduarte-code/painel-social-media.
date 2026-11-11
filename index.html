@@ -583,7 +583,7 @@ function openAccounts(){
   editingId=null;
   $("dtitle").textContent="Contas e frequência";
   drawAccounts();
-  $("dfoot").innerHTML=`<button class="btn" id="addacc">+ Adicionar conta</button><button class="btn primary" id="dclose2">Pronto</button>`;
+  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 11/11</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
   openDrawer();
 }
 function drawAccounts(){
@@ -602,6 +602,9 @@ function bindAccInputs(e){
   const row=e.target.closest(".accrow"); if(!row||!e.target.dataset.k) return;
   const a=accounts[+row.dataset.i]; const k=e.target.dataset.k;
   a[k]= (k==="perDay"||k==="minDay") ? Math.max(0,+e.target.value||0) : e.target.value;
+  // mín nunca acima do máx: mexer em um ajusta o outro
+  if(k==="perDay" && +a.minDay>a.perDay){ a.minDay=a.perDay; const m=row.querySelector('[data-k="minDay"]'); if(m) m.value=a.minDay; }
+  if(k==="minDay" && a.minDay>+a.perDay){ a.perDay=a.minDay; const m=row.querySelector('[data-k="perDay"]'); if(m) m.value=a.perDay; }
   persistAccounts();
   if(k==="perDay"||k==="minDay"||k==="formatos") applyAccountsToDays();
   render();
