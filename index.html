@@ -103,6 +103,43 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 .fmt{font-size:11.5px;border-radius:5px;padding:0 6px;background:var(--accent-soft);color:var(--accent);font-weight:600}
 
 /* por conta */
+.calhead{display:flex;justify-content:space-between;align-items:center;gap:10px 20px;flex-wrap:wrap;margin-bottom:10px}
+.calnav{display:flex;align-items:center;gap:8px}
+.calnav h2{font-size:22px;min-width:170px;text-align:center;text-transform:capitalize}
+.callegend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+.callegend i{font-style:normal}
+.callegend b{color:var(--ink);font-variant-numeric:tabular-nums}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line);gap:1px}
+.calwd{background:color-mix(in srgb,var(--surface) 60%,var(--bg));text-align:center;font-weight:600;font-size:13px;padding:8px 4px;color:var(--muted)}
+.calday{background:var(--surface);min-height:150px;display:flex;flex-direction:column;padding:6px;gap:4px;min-width:0}
+.calday.out{background:color-mix(in srgb,var(--surface) 55%,var(--bg))}
+.calday.out .calnum,.calday.out .callist{opacity:.55}
+.calday.today .calnum{background:var(--accent);color:#fff;border-radius:99px}
+.calday.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+.calnum{align-self:flex-end;border:none;background:none;font-weight:600;font-size:13px;color:var(--muted);padding:2px 8px;font-variant-numeric:tabular-nums}
+.calnum .wd{display:none}
+.callist{display:flex;flex-direction:column;gap:2px;flex:1}
+.calpost{display:flex;align-items:center;gap:5px;border:none;background:none;padding:3px 4px;border-radius:6px;font-size:12px;text-align:left;min-width:0;width:100%}
+.calpost:hover{background:var(--accent-soft)}
+.calpost[data-plan]{opacity:.7}
+.calpost .cn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.01em}
+.ct{font-weight:700;font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ct i{font-style:normal}
+.ct.st-ok{color:var(--ok)} .ct.st-ready{color:var(--accent)} .ct.st-wait{color:var(--warn)} .ct.st-late{color:#b91c1c}
+.calpost .cc{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.calempty{font-size:11.5px;color:var(--muted);padding:2px 4px}
+.calfoot{display:flex;justify-content:space-between;border:none;background:none;font-size:11.5px;color:var(--muted);padding:2px 4px;font-variant-numeric:tabular-nums}
+.calfoot:hover{color:var(--accent)}
+@media (max-width:760px){
+  .calgrid{grid-template-columns:1fr}
+  .calwd{display:none}
+  .calday{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:flex-start}
+  .calday.out{display:none}
+  .calnum{align-self:flex-start;width:56px;text-align:left;display:flex;flex-direction:column;font-size:16px;color:var(--ink)}
+  .calnum .wd{display:block;font-size:11px;text-transform:uppercase;color:var(--muted)}
+  .callist{min-width:0}
+  .calfoot{width:100%}
+}
 .accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .acct{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;border-top:5px solid var(--c)}
 .acct header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
@@ -206,6 +243,7 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-etapa" aria-selected="true">Por etapa</button>
       <button class="tab" role="tab" id="tab-conta" aria-selected="false">Por conta</button>
+      <button class="tab" role="tab" id="tab-cal" aria-selected="false">Calendário</button>
       <span class="spacer"></span>
       <button class="btn ghost" id="openaccounts">Contas e frequência</button>
       <button class="btn primary" id="addpost">+ Novo post</button>
@@ -420,11 +458,12 @@ function render(){
   // abas e filtro
   $("tab-etapa").setAttribute("aria-selected", view==="etapa");
   $("tab-conta").setAttribute("aria-selected", view==="conta");
+  $("tab-cal").setAttribute("aria-selected", view==="cal");
   $("filter").innerHTML = `<button class="chipf" data-f="" aria-pressed="${!accFilter}">Todas as contas</button>` +
     accounts.map(a=>{ const n=posts.filter(p=>p.acc===a.id).length; return `<button class="chipf" data-f="${a.id}" aria-pressed="${accFilter===a.id}"><span class="dot" style="background:${a.color}"></span>${esc(a.name)} <span style="color:var(--muted)">${n}</span></button>`; }).join("");
 
   const shown = posts.filter(p=>!accFilter || p.acc===accFilter);
-  $("view").innerHTML = view==="etapa" ? renderBoard(shown) : renderAccounts(shown);
+  $("view").innerHTML = view==="cal" ? renderCalendar() : view==="etapa" ? renderBoard(shown) : renderAccounts(shown);
 }
 
 function cardHTML(p, showAcc=true){
@@ -441,6 +480,57 @@ function renderBoard(posts){
     const list=sortPosts(posts.filter(p=>colOf(p)===c.k));
     return `<section class="col" aria-label="${c.title}"><h3>${c.title}<small>${list.length}</small></h3>${list.length?list.map(p=>cardHTML(p)).join(""):`<div class="empty">Nada aqui</div>`}</section>`;
   }).join("")}</div>`;
+}
+/* ---------- calendário do mês ---------- */
+let calMonth=null; // "YYYY-MM"
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+function monthKeys(m){
+  const [y,mo]=m.split("-").map(Number); const first=new Date(y,mo-1,1);
+  const start=new Date(first); start.setDate(1-first.getDay());
+  const out=[]; for(let i=0;i<42;i++){ const d=new Date(start); d.setDate(start.getDate()+i); out.push(keyOf(d)); }
+  // tira a última semana se ela for toda do mês seguinte
+  while(out.length>35 && out.slice(-7).every(k=>k.slice(0,7)!==m)) out.splice(-7);
+  return out;
+}
+function planned(k){ // posts previstos para um dia futuro ainda não aberto (não salva nada)
+  const l=getDay(k); if(l) return {list:l, real:true};
+  if(k<todayKey()) return {list:[], real:false};
+  return {list:generateDay(), real:false};
+}
+function renderCalendar(){
+  if(!calMonth) calMonth=cur.slice(0,7);
+  const [y,mo]=calMonth.split("-").map(Number), t=todayKey();
+  const keys=monthKeys(calMonth);
+  let mTotal=0,mDone=0;
+  const cells=keys.map(k=>{
+    const {list,real}=planned(k);
+    const ps=sortPosts(list.filter(p=>!accFilter||p.acc===accFilter));
+    const done=ps.filter(p=>!nextStage(p)).length; if(k.slice(0,7)===calMonth){ mTotal+=ps.length; mDone+=done; }
+    const d=parseKey(k);
+    // uma linha por conta: nome, postados/total, horário do próximo post e status
+    const groups=[]; ps.forEach(p=>{ let g=groups.find(x=>x.acc===p.acc); if(!g){ g={acc:p.acc,list:[]}; groups.push(g);} g.list.push(p); });
+    const items=groups.map(g=>{ const a=acc(g.acc); const dn=g.list.filter(p=>!nextStage(p)).length; const open=g.list.filter(p=>nextStage(p));
+      const st = dn===g.list.length ? ["ok","Tudo postado","✓"] : k<t ? ["late","Ficou post sem postar","!"] : open.every(p=>nextStage(p)==="postado") ? ["ready","Pronto p/ postar","●"] : ["wait","Em produção","◷"];
+      const hrs=open.map(p=>p.hora).filter(Boolean).sort(); const hr = hrs[0] || "";
+      return `<button class="calpost" data-calacc="${k}|${g.acc}" ${real?"":"data-plan=1"} title="${esc(a.name)} · ${dn} de ${g.list.length} postados · ${st[1]}"><span class="dot" style="background:${a.color}"></span><span class="cn">${esc(a.name)}</span><span class="cc">${dn}/${g.list.length}</span><span class="ct st-${st[0]}">${hr?esc(hr)+" ":""}<i aria-label="${st[1]}">${st[2]}</i></span></button>`; }).join("");
+    return `<div class="calday ${k.slice(0,7)!==calMonth?"out":""} ${k===t?"today":""} ${k===cur?"sel":""}">
+      <button class="calnum" data-calday="${k}" aria-label="Abrir ${d.toLocaleDateString("pt-BR",{day:"numeric",month:"long"})}"><span class="wd">${d.toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","")}</span>${d.getDate()}</button>
+      <div class="callist">${items||`<span class="calempty">${k<t?"":"Sem posts"}</span>`}</div>
+      ${ps.length?`<button class="calfoot" data-calday="${k}"><span>${done} / ${ps.length}${real?"":" · previsto"}</span><span>abrir dia</span></button>`:""}
+    </div>`;
+  }).join("");
+  return `<div class="calhead">
+      <div class="calnav"><button class="btn" data-calmove="-1" aria-label="Mês anterior">←</button><h2>${MESES[mo-1]} ${y}</h2><button class="btn" data-calmove="1" aria-label="Próximo mês">→</button><button class="btn ghost" data-calmove="0">Este mês</button></div>
+      <div class="callegend"><span><i class="ct st-ok">✓</i> tudo postado</span><span><i class="ct st-ready">●</i> pronto p/ postar</span><span><i class="ct st-wait">◷</i> em produção</span><span><i class="ct st-late">!</i> ficou sem postar</span><b>${mDone} / ${mTotal} no mês</b></div>
+    </div>
+    <div class="calgrid" role="grid">${["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map(w=>`<div class="calwd">${w}</div>`).join("")}${cells}</div>
+    <p class="hint">Dias futuros que você ainda não abriu mostram a previsão pela frequência das contas. Clique no dia para ver as etapas ou numa conta para ver só os posts dela naquele dia.</p>`;
+}
+async function syncMonth(){
+  if(!db||!calMonth) return;
+  const ks=monthKeys(calMonth);
+  for(let i=0;i<ks.length;i+=6){ await Promise.all(ks.slice(i,i+6).map(async k=>{ const r=await cloudGet("day-"+k); if(r){ delete pending["day-"+k]; days[k]=r; store("day:"+k,r); } })); }
+  if(view==="cal") render();
 }
 function renderAccounts(posts){
   const list = accFilter? accounts.filter(a=>a.id===accFilter) : accounts;
@@ -583,7 +673,7 @@ function openAccounts(){
   editingId=null;
   $("dtitle").textContent="Contas e frequência";
   drawAccounts();
-  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 11/11 · 2</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
+  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 13/11</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
   openDrawer();
 }
 function drawAccounts(){
@@ -646,6 +736,9 @@ document.addEventListener("click", e=>{
   if(t.dataset.zoom!==undefined){ const p=days[cur].find(x=>x.id===editingId); if(p) openZoom(getRef(p).imgs[+t.dataset.zoom]); return; }
   if(t.dataset.delref!==undefined){ const p=days[cur].find(x=>x.id===editingId); if(!p) return; const rf=getRef(p); rf.imgs.splice(+t.dataset.delref,1); saveRef(p); $("refgrid").innerHTML=refGrid(rf); render(); return; }
   if(t.id==="zoomclose"||t.id==="zoom"){ $("zoom").classList.remove("open"); return; }
+  if(t.dataset.calmove!==undefined){ const n=+t.dataset.calmove; if(n===0) calMonth=todayKey().slice(0,7); else { const [y,m]=calMonth.split("-").map(Number); const d=new Date(y,m-1+n,1); calMonth=keyOf(d).slice(0,7); } render(); syncMonth(); return; }
+  if(t.dataset.calday){ cur=t.dataset.calday; view="etapa"; storePref("view",view); go(); window.scrollTo({top:0}); return; }
+  if(t.dataset.calacc){ const [k,a]=t.dataset.calacc.split("|"); cur=k; accFilter=a; view="conta"; storePref("view",view); go(); window.scrollTo({top:0}); return; }
   if(t.dataset.ttab){ textTab=t.dataset.ttab; const p=days[cur].find(x=>x.id===editingId); if(p) drawBody(p); return; }
   if(t.dataset.copy){ const v=($(t.dataset.copy)||{}).value||""; const lbl=t.textContent;
     const done=m=>{ t.textContent=m; setTimeout(()=>{t.textContent=lbl;},1800); };
@@ -660,6 +753,7 @@ document.addEventListener("click", e=>{
     case "today": cur=todayKey(); go(); break;
     case "tab-etapa": view="etapa"; storePref("view",view); render(); break;
     case "tab-conta": view="conta"; storePref("view",view); render(); break;
+    case "tab-cal": view="cal"; storePref("view",view); calMonth=cur.slice(0,7); render(); syncMonth(); break;
     case "addpost": { const a=accFilter?acc(accFilter):accounts[0]; const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); break; }
     case "openaccounts": openAccounts(); break;
     case "addacc": accounts.push({id:uidgen(),name:"Nova conta",role:"",minDay:1,perDay:1,formatos:"Carrossel",color:"#475569"}); persistAccounts(); applyAccountsToDays(); drawAccounts(); render(); break;
