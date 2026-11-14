@@ -125,6 +125,7 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
 .calpost .cn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.01em}
 .ct{font-weight:700;font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ct i{font-style:normal}
+.ct.st-sched{color:#7c3aed} .refpill.prog{color:#7c3aed;border-color:#7c3aed}
 .ct.st-ok{color:var(--ok)} .ct.st-ready{color:var(--accent)} .ct.st-wait{color:var(--warn)} .ct.st-late{color:#b91c1c}
 .calpost .cc{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .calempty{font-size:11.5px;color:var(--muted);padding:2px 4px}
@@ -245,6 +246,7 @@ h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
       <button class="tab" role="tab" id="tab-conta" aria-selected="false">Por conta</button>
       <button class="tab" role="tab" id="tab-cal" aria-selected="false">Calendário</button>
       <span class="spacer"></span>
+      <button class="btn ghost" id="openprog">Marcar programados</button>
       <button class="btn ghost" id="openaccounts">Contas e frequência</button>
       <button class="btn primary" id="addpost">+ Novo post</button>
     </div>
@@ -358,7 +360,8 @@ function colOf(p){
   if(n==="arte"||n==="video") return "midia";
   return "postar";
 }
-function stageLabel(k){ return (STAGES.find(s=>s.k===k)||{}).label || k; }
+function stageLabel(k,p){ if(k==="postado" && p && p.programado) return "Programado"; return (STAGES.find(s=>s.k===k)||{}).label || k; }
+function markProgramado(p,on){ if(on){ stagesOf(p).forEach(s=>p.done[s]=true); p.programado=true; } else { p.programado=false; p.done.postado=false; } }
 
 function getDay(k){
   if(!days[k]){
@@ -470,8 +473,8 @@ function cardHTML(p, showAcc=true){
   const a=acc(p.acc), n=nextStage(p);
   return `<div class="card ${n?"":"posted"}" style="--c:${a.color}" data-open="${p.id}" tabindex="0" role="button" aria-label="Abrir post de ${esc(a.name)}">
     <div class="meta">${showAcc?`<span class="acc">${esc(a.name)}</span>`:"<span></span>"}<span>${p.opcional?`<span class="fmt opt">Opcional</span> `:""}<span class="fmt">${esc(p.formato)}</span>${p.hora?" · "+esc(p.hora):""}</span></div>
-    ${p.temRef?`<span class="refpill">Tem referência</span>`:""}<div class="tema ${p.tema?"":"vazio"}">${p.tema?esc(p.tema):"Sem tema ainda"}</div>
-    <div class="steps">${stagesOf(p).map(s=>`<button class="step ${p.done[s]?"on":(s===n?"cur":"")}" data-tick="${p.id}" data-stage="${s}" aria-pressed="${!!p.done[s]}" title="${p.done[s]?"Desmarcar":"Marcar como feito"}">${p.done[s]?"✓ ":""}${stageLabel(s)}</button>`).join("")}</div>
+    ${p.programado?`<span class="refpill prog">Programado no mLabs</span>`:""}${p.temRef?`<span class="refpill">Tem referência</span>`:""}<div class="tema ${p.tema?"":"vazio"}">${p.tema?esc(p.tema):"Sem tema ainda"}</div>
+    <div class="steps">${stagesOf(p).map(s=>`<button class="step ${p.done[s]?"on":(s===n?"cur":"")}" data-tick="${p.id}" data-stage="${s}" aria-pressed="${!!p.done[s]}" title="${p.done[s]?"Desmarcar":"Marcar como feito"}">${p.done[s]?"✓ ":""}${stageLabel(s,p)}</button>`).join("")}</div>
   </div>`;
 }
 function sortPosts(list){ return list.slice().sort((a,b)=>(a.hora||"99").localeCompare(b.hora||"99")); }
@@ -510,7 +513,7 @@ function renderCalendar(){
     // uma linha por conta: nome, postados/total, horário do próximo post e status
     const groups=[]; ps.forEach(p=>{ let g=groups.find(x=>x.acc===p.acc); if(!g){ g={acc:p.acc,list:[]}; groups.push(g);} g.list.push(p); });
     const items=groups.map(g=>{ const a=acc(g.acc); const dn=g.list.filter(p=>!nextStage(p)).length; const open=g.list.filter(p=>nextStage(p));
-      const st = dn===g.list.length ? ["ok","Tudo postado","✓"] : k<t ? ["late","Ficou post sem postar","!"] : open.every(p=>nextStage(p)==="postado") ? ["ready","Pronto p/ postar","●"] : ["wait","Em produção","◷"];
+      const st = dn===g.list.length && g.list.some(p=>p.programado) && k>=t ? ["sched","Programado no mLabs","⏲"] : dn===g.list.length ? ["ok","Tudo postado","✓"] : k<t ? ["late","Ficou post sem postar","!"] : open.every(p=>nextStage(p)==="postado") ? ["ready","Pronto p/ postar","●"] : ["wait","Em produção","◷"];
       const hrs=open.map(p=>p.hora).filter(Boolean).sort(); const hr = hrs[0] || "";
       return `<button class="calpost" data-calacc="${k}|${g.acc}" ${real?"":"data-plan=1"} title="${esc(a.name)} · ${dn} de ${g.list.length} postados · ${st[1]}"><span class="dot" style="background:${a.color}"></span><span class="cn">${esc(a.name)}</span><span class="cc">${dn}/${g.list.length}</span><span class="ct st-${st[0]}">${hr?esc(hr)+" ":""}<i aria-label="${st[1]}">${st[2]}</i></span></button>`; }).join("");
     return `<div class="calday ${k.slice(0,7)!==calMonth?"out":""} ${k===t?"today":""} ${k===cur?"sel":""}">
@@ -521,7 +524,7 @@ function renderCalendar(){
   }).join("");
   return `<div class="calhead">
       <div class="calnav"><button class="btn" data-calmove="-1" aria-label="Mês anterior">←</button><h2>${MESES[mo-1]} ${y}</h2><button class="btn" data-calmove="1" aria-label="Próximo mês">→</button><button class="btn ghost" data-calmove="0">Este mês</button></div>
-      <div class="callegend"><span><i class="ct st-ok">✓</i> tudo postado</span><span><i class="ct st-ready">●</i> pronto p/ postar</span><span><i class="ct st-wait">◷</i> em produção</span><span><i class="ct st-late">!</i> ficou sem postar</span><b>${mDone} / ${mTotal} no mês</b></div>
+      <div class="callegend"><span><i class="ct st-ok">✓</i> tudo postado</span><span><i class="ct st-sched">⏲</i> programado</span><span><i class="ct st-ready">●</i> pronto p/ postar</span><span><i class="ct st-wait">◷</i> em produção</span><span><i class="ct st-late">!</i> ficou sem postar</span><b>${mDone} / ${mTotal} no mês</b></div>
     </div>
     <div class="calgrid" role="grid">${["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map(w=>`<div class="calwd">${w}</div>`).join("")}${cells}</div>
     <p class="hint">Dias futuros que você ainda não abriu mostram a previsão pela frequência das contas. Clique no dia para ver as etapas ou numa conta para ver só os posts dela naquele dia.</p>`;
@@ -562,7 +565,8 @@ function drawBody(p){
       <div class="field"><label for="f-link">Link (Canva, Drive…)</label><input id="f-link" value="${esc(p.link)}" placeholder="cole o link aqui"></div>
     </div>
     <div class="field"><label for="f-tema">Tema / pauta</label><input id="f-tema" value="${esc(p.tema)}" placeholder="Ex.: Juros abusivos no cartão de crédito"></div>
-    <div class="field"><label>Etapas</label><div class="bigsteps">${stagesOf(p).map(s=>`<label class="bigstep ${p.done[s]?"on":""}"><input type="checkbox" data-st="${s}" ${p.done[s]?"checked":""}> ${stageLabel(s)}</label>`).join("")}</div><span class="hint">${esc(FORMAT_NOTES[p.formato]||"")}</span></div>
+    <div class="field"><label>Etapas</label><div class="bigsteps">${stagesOf(p).map(s=>`<label class="bigstep ${p.done[s]?"on":""}"><input type="checkbox" data-st="${s}" ${p.done[s]?"checked":""}> ${stageLabel(s)}</label>`).join("")}</div><span class="hint">${esc(FORMAT_NOTES[p.formato]||"")}</span>
+      <label class="bigstep ${p.programado?"on":""}" style="margin-top:4px"><input type="checkbox" id="f-prog" ${p.programado?"checked":""}> Já está programado no mLabs</label></div>
     ${textPanel(p)}`;
 }
 let textTab="legenda";
@@ -663,7 +667,8 @@ function bindPostInputs(e){
   else if(t.id==="f-link") p.link=t.value;
   else if(t.id==="f-acc") p.acc=t.value;
   else if(t.id==="f-fmt"){ p.formato=t.value; drawBody(p); }
-  else if(t.dataset.st){ p.done[t.dataset.st]=t.checked; t.closest(".bigstep").classList.toggle("on",t.checked); }
+  else if(t.id==="f-prog"){ markProgramado(p,t.checked); drawBody(p); }
+  else if(t.dataset.st){ if(t.dataset.st==="postado"&&!t.checked) p.programado=false; p.done[t.dataset.st]=t.checked; t.closest(".bigstep").classList.toggle("on",t.checked); }
   else return;
   persistDay(cur); render();
 }
@@ -673,7 +678,7 @@ function openAccounts(){
   editingId=null;
   $("dtitle").textContent="Contas e frequência";
   drawAccounts();
-  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 13/11</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
+  $("dfoot").innerHTML=`<span style="display:flex;gap:10px;align-items:center"><button class="btn" id="addacc">+ Adicionar conta</button><span class="hint">Versão 14/11</span></span><button class="btn primary" id="dclose2">Pronto</button>`;
   openDrawer();
 }
 function drawAccounts(){
@@ -721,6 +726,26 @@ function applyAccountsToDays(){
   keys.forEach(k=>{ if(k<t) return; const list=getDay(k); if(list && syncDayToAccounts(list)) persistDay(k); });
 }
 
+function openProg(){
+  editingId=null; $("dtitle").textContent="Marcar programados";
+  const t=todayKey();
+  $("dbody").innerHTML=`<p class="hint" style="margin:0">Marca como programados (todas as etapas feitas) os posts das contas escolhidas no período. Use quando você já agendou tudo no mLabs.</p>
+    <div class="field"><label>Contas</label><div class="bigsteps">${accounts.map(a=>`<label class="bigstep"><input type="checkbox" data-progacc="${a.id}"> <span class="dot" style="background:${a.color}"></span> ${esc(a.name)}</label>`).join("")}</div></div>
+    <div class="row2"><div class="field"><label for="pg-de">De</label><input type="date" id="pg-de" value="${t}"></div><div class="field"><label for="pg-ate">Até</label><input type="date" id="pg-ate" value="${shift(t,6)}"></div></div>
+    <span class="hint" id="pgmsg"></span>`;
+  $("dfoot").innerHTML=`<span></span><span style="display:flex;gap:8px"><button class="btn" id="dclose2">Fechar</button><button class="btn primary" id="doprog">Marcar como programados</button></span>`;
+  openDrawer();
+}
+async function markScheduled(ids,de,ate){
+  let n=0;
+  for(let k=de;k<=ate;k=shift(k,1)){
+    if(db){ const remote=await cloudGet("day-"+k); if(remote){ delete pending["day-"+k]; days[k]=remote; store("day:"+k,remote); } }
+    const list = getDay(k) || (days[k]=generateDay());
+    list.filter(p=>ids.includes(p.acc)).forEach(p=>{ markProgramado(p,true); n++; });
+    persistDay(k);
+  }
+  return n;
+}
 function openDrawer(){ $("drawer").classList.add("open"); $("drawer").setAttribute("aria-hidden","false"); $("scrim").classList.add("open"); setTimeout(()=>{ const f=$("dbody").querySelector("input,select,textarea"); if(f&&editingId) $("f-tema").focus(); },50); }
 function closeDrawer(){ $("drawer").classList.remove("open"); $("drawer").setAttribute("aria-hidden","true"); $("scrim").classList.remove("open"); editingId=null; render(); }
 
@@ -730,7 +755,7 @@ document.addEventListener("click", e=>{
   if(t.dataset.tick){
     e.stopPropagation();
     const p=days[cur].find(x=>x.id===t.dataset.tick); if(!p) return;
-    p.done[t.dataset.stage]=!p.done[t.dataset.stage]; persistDay(cur); render(); return;
+    p.done[t.dataset.stage]=!p.done[t.dataset.stage]; if(t.dataset.stage==="postado"&&!p.done.postado) p.programado=false; persistDay(cur); render(); return;
   }
   if(t.dataset.open){ openPost(t.dataset.open); return; }
   if(t.dataset.zoom!==undefined){ const p=days[cur].find(x=>x.id===editingId); if(p) openZoom(getRef(p).imgs[+t.dataset.zoom]); return; }
@@ -756,6 +781,14 @@ document.addEventListener("click", e=>{
     case "tab-cal": view="cal"; storePref("view",view); calMonth=cur.slice(0,7); render(); syncMonth(); break;
     case "addpost": { const a=accFilter?acc(accFilter):accounts[0]; const p=newPost(a.id, fmtList(a)[0]); days[cur].push(p); persistDay(cur); render(); openPost(p.id); break; }
     case "openaccounts": openAccounts(); break;
+    case "openprog": openProg(); break;
+    case "doprog": {
+      const ids=[...document.querySelectorAll('[data-progacc]:checked')].map(x=>x.dataset.progacc);
+      const de=$("pg-de").value, ate=$("pg-ate").value;
+      if(!ids.length||!de||!ate||ate<de){ $("pgmsg").textContent="Escolha pelo menos uma conta e um período válido."; break; }
+      t.disabled=true; markScheduled(ids,de,ate).then(n=>{ $("pgmsg").textContent=`Pronto: ${n} posts marcados como programados.`; t.disabled=false; render(); });
+      break;
+    }
     case "addacc": accounts.push({id:uidgen(),name:"Nova conta",role:"",minDay:1,perDay:1,formatos:"Carrossel",color:"#475569"}); persistAccounts(); applyAccountsToDays(); drawAccounts(); render(); break;
     case "dclose": case "dclose2": closeDrawer(); break;
     case "gen": days[cur]=generateDay(); persistDay(cur); render(); break;
@@ -807,6 +840,8 @@ function migrateFreqV3(list){
 }
 if(migrated) regenIfUntouched(cur);
 if(migrateFreqV3(accounts)){ store("accounts",accounts); applyAccountsToDays(); }
+const SEED_PROG={id:"prog-1411", accs:["joao","murilo","diego"], de:"2026-11-14", ate:"2026-11-22"};
+if(loadPref(SEED_PROG.id)!=="1"){ markScheduled(SEED_PROG.accs,SEED_PROG.de,SEED_PROG.ate); storePref(SEED_PROG.id,"1"); }
 render();
 
 /* ---------- nuvem (opcional) ---------- */
@@ -824,6 +859,8 @@ render();
     await Promise.all([syncDay(cur), syncDay(shift(cur,-1))]);
     if((cloudOld||migrated) && untouched(days[cur])){ days[cur]=generateDay(); persistDay(cur); }
     if(migrateFreqV3(accounts)){ persistAccounts(); applyAccountsToDays(); }
+    const flag=await cloudGet("flag-"+SEED_PROG.id);
+    if(!flag){ await markScheduled(SEED_PROG.accs,SEED_PROG.de,SEED_PROG.ate); pending["flag-"+SEED_PROG.id]={json:"1"}; queue(); }
     render(); setSave("Salvo na sua conta");
   }catch(e){ /* segue só no navegador */ }
 })();
